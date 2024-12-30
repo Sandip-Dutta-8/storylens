@@ -1,10 +1,10 @@
 [
     {
-        "q": "Is my journal data secure?",
+        "q": "Is my story data secure?",
         "a": "Yes! We use enterprise-grade encryption and security measures to ensure your entries remain private and secure."
     },
     {
-        "q": "Can I organize my journal entries?",
+        "q": "Can I organize my story entries?",
         "a": "Yes! Use folders, collections, and tags to keep your entries structured. You can also filter by date, mood, or collection."
     },
     {
