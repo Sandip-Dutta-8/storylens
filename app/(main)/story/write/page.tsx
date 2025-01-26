@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic';
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from '@hookform/resolvers/zod';
 import 'react-quill-new/dist/quill.snow.css';
@@ -11,13 +11,18 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getMoodById, MOODS } from '@/app/lib/moods';
 import { Button } from '@/components/ui/button';
+import useFetch from '@/hooks/use-fetch';
+import { useRouter } from 'next/navigation';
+import { createJournalEntry } from '@/actions/story';
+import { toast } from 'sonner';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
 const Write = () => {
 
-  const [isLoading, setIsLoading] = useState(false);
+  const {loading: actionLoading, fn: actionFn, data: actionResult} = useFetch(createJournalEntry);
 
+  const router = useRouter();
 
   const {
     register,
@@ -38,9 +43,31 @@ const Write = () => {
     },
   });
 
+  const isLoading = actionLoading;
+
+  useEffect(() => {
+    if(actionResult && !actionLoading){
+      //@ts-ignore
+      router.push(`/collection/${actionResult.collectionId ? actionResult.collectionId : "unorganized"}`);
+
+      toast.success(`Entry Created Successfully`);
+    }
+  }, [actionResult, actionLoading])
+  
+
   const onSubmit = handleSubmit(async (data) => {
     console.log(data);
+    const mood = getMoodById(data.mood);
+
+    actionFn(
+      {
+        ...data,
+        moodScore: mood.score,
+        moodQuery: mood.pixabayQuery,
+      }
+    )
   });
+
 
   return (
     <div className='py-8'>
