@@ -15,12 +15,31 @@ import useFetch from '@/hooks/use-fetch';
 import { useRouter } from 'next/navigation';
 import { createJournalEntry } from '@/actions/story';
 import { toast } from 'sonner';
+import { createCollection, getCollections } from '@/actions/collection';
+import CollectionForm from '@/components/CollectionForm';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
 const Write = () => {
 
-  const {loading: actionLoading, fn: actionFn, data: actionResult} = useFetch(createJournalEntry);
+  const [isCollectionDialogOpen, setIsCollectionDialogOpen] = useState(false);
+  const {
+    loading: actionLoading,
+    fn: actionFn,
+    data: actionResult
+  } = useFetch(createJournalEntry);
+
+  const {
+    loading: collectionsLoading,
+    data: collections = [],
+    fn: fetchCollections,
+  } = useFetch(getCollections);
+
+  const {
+    loading: createCollectionLoading,
+    fn: createCollectionFn,
+    data: createdCollection,
+  } = useFetch(createCollection);
 
   const router = useRouter();
 
@@ -43,17 +62,20 @@ const Write = () => {
     },
   });
 
-  const isLoading = actionLoading;
 
   useEffect(() => {
-    if(actionResult && !actionLoading){
+    if (actionResult && !actionLoading) {
       //@ts-ignore
       router.push(`/collection/${actionResult.collectionId ? actionResult.collectionId : "unorganized"}`);
 
       toast.success(`Entry Created Successfully`);
     }
   }, [actionResult, actionLoading])
-  
+
+  useEffect(() => {
+    fetchCollections();
+  }, [])
+
 
   const onSubmit = handleSubmit(async (data) => {
     console.log(data);
@@ -68,6 +90,22 @@ const Write = () => {
     )
   });
 
+  useEffect(() => {
+    if (createdCollection) {
+      setIsCollectionDialogOpen(false);
+      fetchCollections();
+      //@ts-ignore
+      setValue("collectionId", createdCollection.id);
+      //@ts-ignore
+      toast.success(`Collection ${createdCollection.name} created!`);
+    }
+  }, [createdCollection]);
+
+  const handleCreateCollection = async (data: any) => {
+    createCollectionFn(data);
+  };
+
+  const isLoading = actionLoading || collectionsLoading;
 
   return (
     <div className='py-8'>
@@ -152,11 +190,11 @@ const Write = () => {
           )}
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium">
+        <div className="space-y-1">
+          <label className="text-sm font-medium text-orange-700">
             Add to Collection (Optional)
           </label>
-          {/* <Controller
+          <Controller
             name="collectionId"
             control={control}
             render={({ field }) => (
@@ -174,28 +212,35 @@ const Write = () => {
                   <SelectValue placeholder="Choose a collection..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {collections?.map((collection) => (
+                  {collections?.map((collection: any) => (
                     <SelectItem key={collection.id} value={collection.id}>
                       {collection.name}
                     </SelectItem>
                   ))}
                   <SelectItem value="new">
-                    <span className="text-orange-600">
+                    <span className="text-orange-600 cursor-pointer">
                       + Create New Collection
                     </span>
                   </SelectItem>
                 </SelectContent>
               </Select>
             )}
-          /> */}
+          />
         </div>
 
         <div className='space-y-4 flex'>
-          <Button type='submit' variant='journal'>
+          <Button type='submit' variant='journal' disabled={actionLoading}>
             Publish
           </Button>
         </div>
       </form>
+
+      <CollectionForm
+        loading={createCollectionLoading}
+        onSuccess={handleCreateCollection}
+        open={isCollectionDialogOpen}
+        setOpen={setIsCollectionDialogOpen}
+      />
     </div>
   )
 }
