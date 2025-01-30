@@ -12,22 +12,44 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getMoodById, MOODS } from '@/app/lib/moods';
 import { Button } from '@/components/ui/button';
 import useFetch from '@/hooks/use-fetch';
-import { useRouter } from 'next/navigation';
-import { createJournalEntry } from '@/actions/story';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { createJournalEntry, getDraft, getJournalEntry, saveDraft, updateJournalEntry } from '@/actions/story';
 import { toast } from 'sonner';
 import { createCollection, getCollections } from '@/actions/collection';
 import CollectionForm from '@/components/CollectionForm';
+import { Loader2 } from 'lucide-react';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
 const Write = () => {
 
   const [isCollectionDialogOpen, setIsCollectionDialogOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const {
+    loading: entryLoading,
+    fn: fetchEntry,
+    data: existingEntry
+  } = useFetch(getJournalEntry);
+
+  const {
+    loading: draftLoading,
+    fn: fetchDraft,
+    data: draftData
+  } = useFetch(getDraft);
+
+  const {
+    loading: savingDraft,
+    fn: saveDraftFn,
+  } = useFetch(saveDraft);
+
   const {
     loading: actionLoading,
     fn: actionFn,
     data: actionResult
-  } = useFetch(createJournalEntry);
+  } = useFetch(isEditMode ? updateJournalEntry : createJournalEntry);
 
   const {
     loading: collectionsLoading,
@@ -63,31 +85,69 @@ const Write = () => {
   });
 
 
+  // Handle successful submission
   useEffect(() => {
     if (actionResult && !actionLoading) {
-      //@ts-ignore
-      router.push(`/collection/${actionResult.collectionId ? actionResult.collectionId : "unorganized"}`);
+      // Clear draft after successful publish
+      if (!isEditMode) {
+        saveDraftFn({ title: "", content: "", mood: "" });
+      }
+      router.push(
+        //@ts-ignore
+        `/collection/${actionResult.collectionId ? actionResult.collectionId : "unorganized"
+        }`
+      );
 
-      toast.success(`Entry Created Successfully`);
+      toast.success(
+        `Entry ${isEditMode ? "updated" : "created"} successfully!`
+      );
     }
-  }, [actionResult, actionLoading])
+  }, [actionResult, actionLoading]);
 
   useEffect(() => {
     fetchCollections();
-  }, [])
+    if (editId) {
+      setIsEditMode(true);
+      fetchEntry(editId);
+    } else {
+      setIsEditMode(false);
+      fetchDraft();
+    }
+  }, [editId])
+
+  // Handle setting form data from draft
+  useEffect(() => {
+    if (isEditMode && existingEntry) {
+      reset({
+        //@ts-ignore
+        title: existingEntry.title || "", content: existingEntry.content || "", mood: existingEntry.mood || "", collectionId: existingEntry.collectionId || "",
+      });
+      //@ts-ignore
+    } else if (draftData?.success && draftData?.data) {
+      reset({
+        //@ts-ignore
+        title: draftData.data.title || "", content: draftData.data.content || "", mood: draftData.data.mood || "",
+        collectionId: "",
+      });
+    } else {
+      reset({
+        title: "",
+        content: "",
+        mood: "",
+        collectionId: "",
+      });
+    }
+  }, [draftData, isEditMode, existingEntry]);
 
 
   const onSubmit = handleSubmit(async (data) => {
-    console.log(data);
     const mood = getMoodById(data.mood);
-
-    actionFn(
-      {
-        ...data,
-        moodScore: mood.score,
-        moodQuery: mood.pixabayQuery,
-      }
-    )
+    actionFn({
+      ...data,
+      moodScore: mood.score,
+      moodQuery: mood.pixabayQuery,
+      ...(isEditMode && { id: editId }),
+    });
   });
 
   useEffect(() => {
@@ -101,17 +161,41 @@ const Write = () => {
     }
   }, [createdCollection]);
 
+  const formData = watch()
+
+  const handleSaveDraft = async () => {
+    if (!isDirty) {
+      toast.error("No changes to save");
+      return;
+    }
+    //@ts-ignore
+    await saveDraftFn(formData);
+  };
+
+  useEffect(() => {
+    //@ts-ignore
+    if (saveDraft?.success && !savingDraft) {
+      toast.success("Draft saved successfully");
+    }
+
+  }, [saveDraft, savingDraft])
+
   const handleCreateCollection = async (data: any) => {
     createCollectionFn(data);
   };
 
-  const isLoading = actionLoading || collectionsLoading;
+  const isLoading =
+    collectionsLoading ||
+    entryLoading ||
+    draftLoading ||
+    actionLoading ||
+    savingDraft;
 
   return (
     <div className='py-8'>
       <form className="space-y-2  mx-auto" onSubmit={onSubmit}>
         <h1 className="text-5xl md:text-6xl gradient-title">
-          What's on your mind?
+          {isEditMode ? "Edit Entry" : "What's on your mind?"}
         </h1>
 
         {isLoading && (
@@ -228,10 +312,38 @@ const Write = () => {
           />
         </div>
 
-        <div className='space-y-4 flex'>
-          <Button type='submit' variant='journal' disabled={actionLoading}>
-            Publish
+        <div className="space-x-4 flex">
+          {!isEditMode && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={savingDraft || !isDirty}
+            >
+              {savingDraft && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save as Draft
+            </Button>
+          )}
+          <Button
+            type="submit"
+            variant="journal"
+            disabled={actionLoading || !isDirty}
+          >
+            {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditMode ? "Update" : "Publish"}
           </Button>
+          {isEditMode && (
+            <Button
+              onClick={(e) => {
+                e.preventDefault();
+                //@ts-ignore
+                router.push(`/story/${existingEntry?.id}`);
+              }}
+              variant="destructive"
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </form>
 

@@ -4,7 +4,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 const MoodAnalyticsSkeleton = () => {
     return (
         <div className="space-y-4">
-            <h2 className="text-5xl font-bold gradient-title">Dashboard</h2>
             <Skeleton className="h-12 w-60" />
             {/* Stats Cards Skeleton */}
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">

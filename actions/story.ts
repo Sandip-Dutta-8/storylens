@@ -237,3 +237,113 @@ export async function deleteJournalEntry(id: any) {
     }
 }
 
+export async function updateJournalEntry(data: any) {
+    try {
+        const { userId } = await auth();
+        if (!userId) throw new Error("Unauthorized");
+
+        const user = await db.user.findUnique({
+            where: { clerkUserId: userId },
+        });
+
+        if (!user) throw new Error("User not found");
+
+        // Check if entry exists and belongs to user
+        const existingEntry = await db.entry.findFirst({
+            where: {
+                id: data.id,
+                userId: user.id,
+            },
+        });
+
+        if (!existingEntry) throw new Error("Entry not found");
+
+        // Get mood data
+        //@ts-ignore
+        const mood = MOODS[data.mood.toUpperCase()];
+        if (!mood) throw new Error("Invalid mood");
+
+        // Get new mood image if mood changed
+        let moodImageUrl = existingEntry.moodImageUrl;
+        if (existingEntry.mood !== mood.id) {
+            moodImageUrl = await getPixabayImg(data.moodQuery);
+        }
+
+        // Update the entry
+        const updatedEntry = await db.entry.update({
+            where: { id: data.id },
+            data: {
+                title: data.title,
+                content: data.content,
+                mood: mood.id,
+                moodScore: mood.score,
+                moodImageUrl,
+                collectionId: data.collectionId || null,
+            },
+        });
+
+        revalidatePath("/dashboard");
+        revalidatePath(`/story/${data.id}`);
+        return updatedEntry;
+    } catch (error) {
+        throw new Error();
+    }
+}
+
+export async function getDraft() {
+    try {
+        const { userId } = await auth();
+        if (!userId) throw new Error("Unauthorized");
+
+        const user = await db.user.findUnique({
+            where: { clerkUserId: userId },
+        });
+
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        const draft = await db.draft.findUnique({
+            where: { userId: user.id },
+        });
+
+        return { success: true, data: draft };
+    } catch (error) {
+        return { success: false, error: error };
+    }
+}
+
+export async function saveDraft(data : any) {
+    try {
+        const { userId } = await auth();
+        if (!userId) throw new Error("Unauthorized");
+
+        const user = await db.user.findUnique({
+            where: { clerkUserId: userId },
+        });
+
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        const draft = await db.draft.upsert({
+            where: { userId: user.id },
+            create: {
+                title: data.title,
+                content: data.content,
+                mood: data.mood,
+                userId: user.id,
+            },
+            update: {
+                title: data.title,
+                content: data.content,
+                mood: data.mood,
+            },
+        });
+
+        revalidatePath("/dashboard");
+        return { success: true, data: draft };
+    } catch (error) {
+        return { success: false, error: error };
+    }
+}
