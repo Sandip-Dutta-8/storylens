@@ -63,24 +63,28 @@ export async function createCollection(data: any) {
 
 //get collection
 export async function getCollections() {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    try {
+        const { userId } = await auth();
+        if (!userId) return null; // Return null instead of throwing an error
 
-    const user = await db.user.findUnique({
-        where: { clerkUserId: userId },
-    });
+        const user = await db.user.findUnique({
+            where: { clerkUserId: userId },
+        });
 
-    if (!user) {
-        throw new Error("User not found");
+        if (!user) return null; // Return null if user not found
+
+        const collections = await db.collection.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: "desc" },
+        });
+
+        return collections;
+    } catch (error) {
+        console.error("Error fetching collections:", error);
+        return null;
     }
-
-    const collections = await db.collection.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-    });
-
-    return collections;
 }
+
 
 //delete collection
 export async function deleteCollection(id: any) {
