@@ -21,13 +21,13 @@ const Header = async () => {
                                 <span className="hidden md:inline">Collections</span>
                             </Button>
                         </Link>
+                        <Link href="/story/write">
+                            <Button variant="journal" className="flex items-center gap-2">
+                                <PenBox size={18} />
+                                <span className="hidden md:inline">Write New</span>
+                            </Button>
+                        </Link>
                     </SignedIn>
-                    <Link href="/story/write">
-                        <Button variant="journal" className="flex items-center gap-2">
-                            <PenBox size={18} />
-                            <span className="hidden md:inline">Write New</span>
-                        </Button>
-                    </Link>
                     <SignedOut>
                         <SignInButton forceRedirectUrl="/dashboard">
                             <Button variant="outline">Login</Button>
